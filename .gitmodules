@@ -1,6 +1,7 @@
-[submodule ".\\includes\\phnt"]
-	path = .\\includes\\phnt
-	url = https://github.com/processhacker/phnt.git
-[submodule ".\\includes\\fmt"]
-	path = .\\includes\\fmt
-	url = https://github.com/fmtlib/fmt.git
+[submodule "includes/phnt"]
+	path = includes/phnt
+	url = git://github.com/processhacker/phnt.git
+[submodule "includes/fmt"]
+	path = includes/fmt
+	url = git://github.com/fmtlib/fmt.git
+
