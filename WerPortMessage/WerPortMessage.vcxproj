@@ -149,8 +149,10 @@
   <ItemGroup>
     <ClCompile Include="..\includes\fmt\src\format.cc" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Messages.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Messages.h" />
     <ClInclude Include="weralpc.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

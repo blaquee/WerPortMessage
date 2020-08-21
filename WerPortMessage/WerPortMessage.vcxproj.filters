@@ -24,9 +24,15 @@
     <ClCompile Include="..\includes\fmt\src\format.cc">
       <Filter>Source Files\fmt</Filter>
     </ClCompile>
+    <ClCompile Include="Messages.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="weralpc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Messages.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

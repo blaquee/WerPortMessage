@@ -1,58 +1,62 @@
 #define PHNT_VERSION PHNT_WINBLUE
-#define UNICODE
 #include <phnt_windows.h>
 #include <phnt.h>
 #include <fmt/format.h>
 #include <string>
 #include <vector>
 #include "weralpc.h"
+#include "Messages.h"
 
 #pragma comment(lib, "ntdll.lib")
 
+WNF_STATE_NAME WNF_WER_SERVICE_START = {
+    0xa3bc0875, 0x41940b3a };
 
-BOOL InitWERSvcHeader(PWERSVC* WerMsg)
+BOOL InitWERSvcHeader(PWERPORTMSG* WerMsg)
 {
     *WerMsg = nullptr;
 
-    USHORT usWerMsgSize = 0x550;
+    USHORT usWerMsgSize = sizeof(WERMSG);
     USHORT totalSize = usWerMsgSize + sizeof(PORT_MESSAGE); // 0x578
 
-    auto localWerMsg = (PWERSVC)malloc(totalSize);
+    auto localWerMsg = (PWERPORTMSG)malloc(totalSize);
     RtlZeroMemory(localWerMsg, totalSize);
 
     // set this size initially
+    localWerMsg->Header.u2.s2.Type = 0;
     localWerMsg->Header.u1.s1.TotalLength = totalSize;
+    localWerMsg->Data.Version = 0x20000000;
     *WerMsg = localWerMsg;
     return TRUE;
 }
 
 // init alpc port attributes
-void InitializeAlpcPortAttributes(ALPC_PORT_ATTRIBUTES& AlpcPortAttributes)
-{
-    SIZE_T MaxMessageLength;
-    SIZE_T MemoryBandwidth = 0;
-    SIZE_T MaxPoolUsage = 0;
-    SIZE_T MaxSectionSize = 0;
-    SIZE_T MaxViewSize = 0;
-    ULONG DupObjectTypes = 0;
-    RtlZeroMemory(&AlpcPortAttributes, sizeof(AlpcPortAttributes));
-
-    MaxMessageLength = 0x578; // for WER, this is max message length.
-
-    AlpcPortAttributes.Flags = ALPC_PORT_ATTRIBUTES_VALUES::kAlpcPortAttributesAllowImpersonation |
-        ALPC_PORT_ATTRIBUTES_VALUES::kAlpcPortAttributesAllowLpcRequests;
-    AlpcPortAttributes.MaxMessageLength = MaxMessageLength;
-    AlpcPortAttributes.MemoryBandwidth = MemoryBandwidth;
-    AlpcPortAttributes.MaxMessageLength = MaxPoolUsage;
-    AlpcPortAttributes.MaxSectionSize = MaxSectionSize;
-    AlpcPortAttributes.MaxViewSize = MaxViewSize;
-    AlpcPortAttributes.DupObjectTypes = DupObjectTypes;
-
-    // AlpcPortAttributes.SecurityQos.Length = sizeof(AlpcPortAttributes.SecurityQos);
-    // AlpcPortAttributes.SecurityQos.ImpersonationLevel = SECURITY_IMPERSONATION_LEVEL::SecurityImpersonation;
-    // AlpcPortAttributes.SecurityQos.ContextTrackingMode = SECURITY_DYNAMIC_TRACKING;
-    // AlpcPortAttributes.SecurityQos.EffectiveOnly = false;
-}
+// void InitializeAlpcPortAttributes(PALPC_PORT_ATTRIBUTES *AlpcPortAttributes)
+// {
+//     SIZE_T MaxMessageLength;
+//     SIZE_T MemoryBandwidth = 0;
+//     SIZE_T MaxPoolUsage = 0;
+//     SIZE_T MaxSectionSize = 0;
+//     SIZE_T MaxViewSize = 0;
+//     ULONG DupObjectTypes = 0;
+//     *AlpcPortAttributes = nullptr;
+//     //RtlZeroMemory(&AlpcPortAttributes, sizeof(ALPC_PORT_ATTRIBUTES));
+// 
+//     MaxMessageLength = 0x578; // for WER, this is max message length.
+// 
+//     AlpcPortAttributes.Flags = 0;
+//     AlpcPortAttributes.MaxMessageLength = MaxMessageLength;
+//     AlpcPortAttributes.MemoryBandwidth = 0;
+//     AlpcPortAttributes.MaxMessageLength = 0;
+//     AlpcPortAttributes.MaxSectionSize = 0;
+//     AlpcPortAttributes.MaxViewSize = 0;
+//     AlpcPortAttributes.DupObjectTypes = 0;
+// 
+//     // AlpcPortAttributes.SecurityQos.Length = sizeof(AlpcPortAttributes.SecurityQos);
+//     // AlpcPortAttributes.SecurityQos.ImpersonationLevel = SECURITY_IMPERSONATION_LEVEL::SecurityImpersonation;
+//     // AlpcPortAttributes.SecurityQos.ContextTrackingMode = SECURITY_DYNAMIC_TRACKING;
+//     // AlpcPortAttributes.SecurityQos.EffectiveOnly = false;
+// }
 
 int main(int argc, char** argv)
 {
@@ -65,9 +69,11 @@ int main(int argc, char** argv)
     UNICODE_STRING ucWerPortString;
     UNICODE_STRING ucErrorPortReady;
     OBJECT_ATTRIBUTES obj;
-    HANDLE hAlpcPortHandle = INVALID_HANDLE_VALUE;
+    HANDLE hAlpcPortHandle = NULL;
     HANDLE hEventHandle = NULL;
 
+    memset((PVOID)&ucWerPortString, 0, sizeof(UNICODE_STRING));
+    memset((PVOID)&ucErrorPortReady, 0, sizeof(UNICODE_STRING));
     RtlInitUnicodeString(&ucWerPortString, L"\\WindowsErrorReportingServicePort");
     RtlInitUnicodeString(&ucErrorPortReady, L"\\KernelObjects\\SystemErrorPortReady");
 
@@ -91,39 +97,45 @@ int main(int argc, char** argv)
     ZwUpdateWnfStateData(&WNF_WER_SERVICE_START,
                          0, 0, 0, 0, 0, 0);
 
-//     // Get the timeout value to wait for service init
-//     status = NtQuerySystemInformation((SYSTEM_INFORMATION_CLASS)SystemErrorPortTimeouts,
-//                                       (PVOID)&ulPortTimeouts, sizeof(LARGE_INTEGER), &dwRetLen);
-//     if (!NT_SUCCESS(status))
-//     {
-//         fmt::print("Query System Info Failed with status and value: {:X}: {}\n", status,
-//                    ulPortTimeouts.LowPart);
-//         std::getchar();
-//         return 0;
-//     }
-//     fmt::print("Port Timeout Value: {}:{}\n",
-//                ulPortTimeouts.HighPart, ulPortTimeouts.LowPart);
-// 
-//     // ensure WERSvc started and establish comms
-//     //OBJECT_ATTRIBUTES obj;
-//     obj.Length = sizeof(OBJECT_ATTRIBUTES);
-//     obj.RootDirectory = 0;
-//     obj.ObjectName = &ucErrorPortReady;
-//     obj.SecurityDescriptor = NULL;
-//     obj.SecurityQualityOfService = NULL;
-// 
-//     status = NtOpenEvent(&hEventHandle, EVENT_ALL_ACCESS, &obj);
-//     if (!NT_SUCCESS(status))
-//     {
-//         fmt::print("Failed to Open Event\n");
-//         std::getchar();
-//         return 0;
-//     }
+    // Get the timeout value to wait for service init
+    status = NtQuerySystemInformation((SYSTEM_INFORMATION_CLASS)SystemErrorPortTimeouts,
+                                      (PVOID)&ulPortTimeouts, 
+                                      sizeof(LARGE_INTEGER), 
+                                      &dwRetLen);
+    if (!NT_SUCCESS(status))
+    {
+        fmt::print("Query System Info Failed with status and value: {:X}: {}\n", status,
+                   ulPortTimeouts.LowPart);
+        std::getchar();
+        return 0;
+    }
+    fmt::print("Port Timeout Value: high{}:low{}:quad:{:X}\n",
+               ulPortTimeouts.HighPart, ulPortTimeouts.LowPart, ulPortTimeouts.QuadPart);
+
+    /* Not Important */
+    OBJECT_ATTRIBUTES objTimeoutObject;
+    memset(&objTimeoutObject, 0, sizeof(OBJECT_ATTRIBUTES));
+    objTimeoutObject.Length = sizeof(OBJECT_ATTRIBUTES);
+    objTimeoutObject.RootDirectory = 0;
+    objTimeoutObject.ObjectName = &ucErrorPortReady;
+    objTimeoutObject.SecurityDescriptor = NULL;
+    //werobj.SecurityQualityOfService = NULL;
+
+    status = NtOpenEvent(&hEventHandle, EVENT_QUERY_STATE, &objTimeoutObject);
+    if (!NT_SUCCESS(status))
+    {
+        fmt::print("Failed to Open Event\n");
+        std::getchar();
+        return 0;
+    }
+    NtWaitForSingleObject(hEventHandle, 0, 0);
+    NtClose(hEventHandle);
 
     // allocate space for sid +1 subauthority
     ULONG ulSidLen = RtlLengthRequiredSid(1);
     fmt::print("Required SID length: {:X}\n", ulSidLen);
 
+    //PVOID sidspace = VirtualAlloc(NULL, 1, MEM_COMMIT, PAGE_READWRITE);
     char* sidspace = (char*)malloc(ulSidLen);
     memset(sidspace, 0, ulSidLen);
     pSid = (PSID)sidspace;
@@ -150,19 +162,32 @@ int main(int argc, char** argv)
 
     // initialize port attributes
     fmt::print("Initializing Port Attributes\n");
-    ALPC_PORT_ATTRIBUTES alpcPortAttributes = { 0 };
-    InitializeAlpcPortAttributes(alpcPortAttributes);
-    InitializeObjectAttributes(&obj, NULL, NULL, NULL, NULL);
+    ALPC_PORT_ATTRIBUTES alpcPortAttributes;
+    memset(&alpcPortAttributes, 0, sizeof(ALPC_PORT_ATTRIBUTES));
+    alpcPortAttributes.MaxMessageLength = 0x578;
+
+   /* InitializeAlpcPortAttributes(&alpcPortAttributes);*/
+
+    memset(&obj, 0, sizeof(OBJECT_ATTRIBUTES));
+    obj.Length = sizeof(OBJECT_ATTRIBUTES);
+    obj.RootDirectory = 0;
+    obj.ObjectName = NULL;
+    obj.SecurityDescriptor = NULL;
+
+    /*InitializeObjectAttributes(&obj, NULL, NULL, NULL, NULL);*/
     // Connect to the Alpc Port
     fmt::print("Connecting to port\n");
+
     status = NtAlpcConnectPort(&hAlpcPortHandle,
                                &ucWerPortString,
                                &obj,
                                &alpcPortAttributes,
                                ALPC_MESSAGE_FLAGS::kAlpcMessageFlagSyncRequest,
-                               &pSid,
+                               pSid,
                                NULL, NULL,
-                               NULL, NULL, NULL);
+                               NULL, NULL, 
+                               &ulPortTimeouts);
+    std::printf("Status: %X\n", status);
     if (!NT_SUCCESS(status))
     {
 
@@ -176,5 +201,8 @@ int main(int argc, char** argv)
 
     fmt::print("Connected to port. Press a key to cont.\n");
     std::getchar();
+
+    // Attempt to send messages to the port
+
     return 0;
 }

@@ -10,6 +10,7 @@
 
 typedef struct _WERHANDLETABLE
 {
+    ULONG NumHandles;
     HANDLE *Handles;
 }WERHANDLETABLE, * PWERHANDLETABLE;
 
@@ -32,6 +33,8 @@ typedef struct _WERPORTMSG
     WERMSG Data;
 } WERPORTMSG, * PWERPORTMSG;
 
+WNF_STATE_NAME WNF_WER_SERVICE_START = {
+    0xa3bc0875, 0x41940b3a };
 
 
 typedef enum _ALPC_PORT_ATTRIBUTES_VALUES
